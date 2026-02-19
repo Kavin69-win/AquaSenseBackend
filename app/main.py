@@ -2,7 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import uvicorn
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+GROQ_API_KEY = os.getenv("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")
 # Import all feature routers
 # Ensure these files exist in your app/api/v1/endpoints/ folder
 from app.api.v1.endpoints import (
