@@ -1,6 +1,6 @@
 import os
 import json
-from groq import AsyncGroq  # Use native Groq Async client
+  # Use native Groq Async client
 from pydantic import BaseModel
 from dotenv import load_dotenv
 # --- CENTRAL SETTINGS ---
@@ -10,9 +10,8 @@ load_dotenv()
 
 # 1. Initialize Direct Groq Client
 # Ensure your .env has: GROQ_API_KEY=gsk_...
-client = AsyncGroq(
-    api_key=settings.GROQ_API_KEY.get_secret_value()
-)
+
+
 
 # 2. Define the response structure for documentation/safety
 class ThresholdResponse(BaseModel):
