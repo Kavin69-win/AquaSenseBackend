@@ -1,42 +1,64 @@
 import os
 import json
-from groq import Groq # Switched from genai to groq
+from groq import AsyncGroq  # Use native Groq Async client
+from pydantic import BaseModel
 from dotenv import load_dotenv
+# --- CENTRAL SETTINGS ---
+from app.core.config import settings 
 
 load_dotenv()
 
-# Initialize Groq Client
-# Ensure you have GROQ_API_KEY=gsk_... in your .env
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# 1. Initialize Direct Groq Client
+# Ensure your .env has: GROQ_API_KEY=gsk_...
+client = AsyncGroq(
+    api_key=settings.GROQ_API_KEY.get_secret_value()
+)
+
+# 2. Define the response structure for documentation/safety
+class ThresholdResponse(BaseModel):
+    threshold: float
+    reason: str
 
 async def calculate_soil_threshold(crop_name: str, soil_type: str, growth_stage: str):
     """
-    AI Logic Engine powered by Groq (Llama 3).
+    AI Logic Engine powered by Groq LPU.
+    Calculates the optimal soil moisture threshold for irrigation.
     """
+    
+    # We specify JSON instructions in the prompt for Llama 3.3
     prompt = f"""
-    Return ONLY a raw JSON object for an irrigation system. 
+    Return a JSON object for an irrigation system. 
     INPUT: Crop: {crop_name}, Soil: {soil_type}, Stage: {growth_stage}.
     FORMAT: {{"threshold": float, "reason": "string"}}
     """
-    
+
     try:
-        # Using Llama 3 on Groq for ultra-fast response
-        response = client.chat.completions.create(
+        # Groq's LPU is ultra-fast. We use JSON mode here.
+        chat_completion = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a precision agriculture logic engine."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system", 
+                    "content": "You are a precision agriculture logic engine. You must output valid JSON."
+                },
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
             ],
-            response_format={"type": "json_object"} # Forces JSON output
+            # This ensures Groq returns a structured JSON object
+            response_format={"type": "json_object"}
         )
         
-        return json.loads(response.choices[0].message.content)
+        ai_response = chat_completion.choices[0].message.content
+        return json.loads(ai_response)
 
     except Exception as e:
-        print(f"DEBUG ERROR: {e}") 
-        soil_lower = soil_type.lower()
+        print(f"⚠️ Groq Logic Engine failed: {e}")
         
-        # --- HARDCODED SMART FALLBACK (Same as before) ---
+        # --- FINAL HARDCODED FALLBACK (Your Safety Net) ---
+        print("🚨 Using Hardcoded Safety Logic.")
+        soil_lower = soil_type.lower()
         if "sandy" in soil_lower:
             smart_val, reason = 0.45, "Offline: Sandy soil needs high frequency."
         elif "clay" in soil_lower:
