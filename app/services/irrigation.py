@@ -10,14 +10,22 @@ def calculate_universal_duration(user: models.User, crop: models.Crop):
         "tank": 3.0
     }
 
-    # 2. Soil adjustment factors
+    # 2. Soil adjustment factors (Calibrated for Punjab Region)
     soil_multipliers = {
-        "loamy": 1.0,      
+        # --- Punjab Specific Soils ---
+        "loamy": 1.0,           # Standard alluvial (Central Punjab) - Baseline
+        "silt_loam": 1.0,       # Very fertile, similar water needs to loamy
+        "sandy_loam": 1.15,     # Common across Punjab, drains slightly faster
+        "clay_loam": 0.9,       # Holds water well, needs slightly less runtime
+        "sandy": 1.4,           # South-West Punjab (Bathinda/Mansa), drains very fast
+        "clay": 0.8,            # Heavy soil (Gurdaspur/Hoshiarpur), holds water tightly
+        "kandi": 1.5,           # Gravelly sub-mountainous soil, very poor water retention
+        "saline": 1.2,          # Kallar/salt-affected soil, needs extra water for leaching salts
+        
+        # --- General/Other regions (Fallback) ---
         "red": 1.3,        
-        "laterite": 1.5,   
-        "clay": 0.8        
+        "laterite": 1.5   
     }
-
     # 3. Extract user data safely
     acres = user.field_size_acres or 1.0
     soil = (getattr(user, "soil_type", "loamy") or "loamy").lower().strip()
