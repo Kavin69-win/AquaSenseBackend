@@ -9,10 +9,10 @@ load_dotenv()
 # Initialize Groq Client
 # Replace this with your Groq API key (gsk_...)
 # Get one at: https://console.groq.com/keys
-manual_key = "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"
-
 try:
-    client = Groq(api_key=manual_key)
+    client = Groq(
+        api_key=os.getenv("GROQ_API_KEY") 
+    )
     print("✅ AquaBot Client (Groq) initialized.")
 except Exception as e:
     print(f"Failed to initialize AI client: {e}")
