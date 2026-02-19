@@ -3,8 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AquaSense"
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:kavinsharma@localhost:5432/AquaSense"
-    
+    DATABASE_URL: str  # ❌ remove localhost default
+
+    class Config:
+        env_file = ".env"
     # --- GROQ CONFIGURATION ---
     GROQ_API_KEY: SecretStr = SecretStr("gsk_placeholder")
     
