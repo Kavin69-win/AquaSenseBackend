@@ -1,19 +1,18 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from app.core.config import settings  # ← use central config
 
-# Updated with your specific credentials:
-# User: postgres
-# Password: kavinsharma
-# Host: localhost:5432
-# Database: AquaSense
-DATABASE_URL = "postgresql+asyncpg://postgres:kavinsharma@localhost:5432/AquaSense"
+# Use DATABASE_URL from settings (Render env or local env)
+DATABASE_URL = settings.DATABASE_URL
 
-# Create the Async Engine
-# echo=True is great for debugging—it shows the SQL in your terminal
-engine = create_async_engine(DATABASE_URL, echo=True)
+# Create Async Engine
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,
+    future=True
+)
 
-# Create the Session Factory
-# This 'SessionLocal' is what deps.py uses to talk to the DB
+# Create Session Factory
 SessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
