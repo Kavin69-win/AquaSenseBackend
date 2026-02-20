@@ -1,68 +1,100 @@
-import os
 import json
-  # Use native Groq Async client
+from groq import AsyncGroq
 from pydantic import BaseModel
-from dotenv import load_dotenv
-# --- CENTRAL SETTINGS ---
-from app.core.config import settings 
 
-load_dotenv()
-
-# 1. Initialize Direct Groq Client
-# Ensure your .env has: GROQ_API_KEY=gsk_...
+from app.core.config import settings
 
 
-
-# 2. Define the response structure for documentation/safety
+# ===== Response Schema =====
 class ThresholdResponse(BaseModel):
     threshold: float
     reason: str
 
-async def calculate_soil_threshold(crop_name: str, soil_type: str, growth_stage: str):
+
+# ===== Lazy Groq Client (Safe) =====
+def get_groq_client():
+    if not settings.GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not configured")
+
+    return AsyncGroq(
+        api_key=settings.GROQ_API_KEY.get_secret_value()
+    )
+
+
+# ===== AI Logic Engine =====
+async def calculate_soil_threshold(
+    crop_name: str,
+    soil_type: str,
+    growth_stage: str
+):
     """
-    AI Logic Engine powered by Groq LPU.
-    Calculates the optimal soil moisture threshold for irrigation.
-    """
-    
-    # We specify JSON instructions in the prompt for Llama 3.3
-    prompt = f"""
-    Return a JSON object for an irrigation system. 
-    INPUT: Crop: {crop_name}, Soil: {soil_type}, Stage: {growth_stage}.
-    FORMAT: {{"threshold": float, "reason": "string"}}
+    AI-powered irrigation threshold calculator.
+    Uses Groq Llama 3.3 70B.
     """
 
+    client = get_groq_client()
+
+    prompt = f"""
+Return a JSON object for an irrigation system.
+
+INPUT:
+Crop: {crop_name}
+Soil: {soil_type}
+Growth Stage: {growth_stage}
+
+FORMAT:
+{{
+  "threshold": float between 0.15 and 0.60,
+  "reason": "short agronomy explanation"
+}}
+"""
+
     try:
-        # Groq's LPU is ultra-fast. We use JSON mode here.
         chat_completion = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
-                    "role": "system", 
-                    "content": "You are a precision agriculture logic engine. You must output valid JSON."
+                    "role": "system",
+                    "content": (
+                        "You are a precision agriculture irrigation engine. "
+                        "You must return strictly valid JSON."
+                    ),
                 },
                 {
-                    "role": "user", 
-                    "content": prompt
+                    "role": "user",
+                    "content": prompt,
                 }
             ],
-            # This ensures Groq returns a structured JSON object
-            response_format={"type": "json_object"}
+            temperature=0.2,
+            response_format={"type": "json_object"},
         )
-        
+
         ai_response = chat_completion.choices[0].message.content
-        return json.loads(ai_response)
+        parsed = json.loads(ai_response)
+
+        # Safety validation
+        threshold = float(parsed.get("threshold", 0.32))
+        threshold = max(0.15, min(0.60, threshold))  # Clamp range
+
+        return {
+            "threshold": threshold,
+            "reason": parsed.get("reason", "AI generated threshold")
+        }
 
     except Exception as e:
         print(f"⚠️ Groq Logic Engine failed: {e}")
-        
-        # --- FINAL HARDCODED FALLBACK (Your Safety Net) ---
         print("🚨 Using Hardcoded Safety Logic.")
-        soil_lower = soil_type.lower()
-        if "sandy" in soil_lower:
-            smart_val, reason = 0.45, "Offline: Sandy soil needs high frequency."
-        elif "clay" in soil_lower:
-            smart_val, reason = 0.20, "Offline: Clay retains water; low threshold."
-        else:
-            smart_val, reason = 0.32, f"Offline: Standard threshold for {soil_type}."
 
-        return {"threshold": smart_val, "reason": reason}
+        soil_lower = soil_type.lower()
+
+        if "sandy" in soil_lower:
+            smart_val, reason = 0.45, "Offline fallback: Sandy soil drains fast."
+        elif "clay" in soil_lower:
+            smart_val, reason = 0.20, "Offline fallback: Clay retains water."
+        else:
+            smart_val, reason = 0.32, f"Offline fallback: Standard threshold for {soil_type}."
+
+        return {
+            "threshold": smart_val,
+            "reason": reason
+        }
